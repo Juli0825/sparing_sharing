@@ -1,30 +1,33 @@
 install.packages("raster")
 install.packages("ncdf4")
-install.packages("gdalUtils")
 
-library(gdalUtils)
 library(raster)
 library(ncdf4)
+
+
+setwd("Y:/sparing_sharing/sparing_rproject")
 
 ##### Land cover layers preprocessing #################
 
 #Load 2005 Land cover data
-LC_2005_nc <- "Data/ESA_LC/ESACCI-LC-L4-LCCS-Map-300m-P1Y-2005-v2.0.7cds.nc"
-
-# Open the NC file
-land_cover_2005 <- nc_open(LC_2005_nc)
-
-# Print the variable names
-print(land_cover_2005$var)
-nc_close(land_cover_2005)
+LC2005_nc <- "Data/ESA_LC/ESACCI-LC-L4-LCCS-Map-300m-P1Y-2005-v2.0.7cds.nc"
 
 # Load only the first time slice of the variable 'lccs_class' as a raster layer
-landcover_2005_raster <- raster(LC_2005_nc, varname = "lccs_class", band = 1)  # 'band = 1' to specify first time slice
+landcover_2005_raster <- brick(LC2005_nc, varname = "lccs_class", band = 1)  # 'band = 1' to specify first time slice
 
 print(landcover_2005_raster)
 
 # Save the raster as a GeoTIFF for easier future access
 writeRaster(landcover_2005_raster, "Data/ESA_LC/landcover_2005raster.tif", format = "GTiff", overwrite = TRUE)
+
+# Read the GeoTIFF file
+lc2005_raster <- raster("Data/ESA_LC/landcover_2005raster.tif")
+
+# Print basic information about the raster
+print(lc2005_raster)
+
+# Plot the raster
+plot(lc2005_raster, main = "Land Cover 2005")
 
 # Define cropland and non-cropland codes 
 # Codes 10 and 20 are fully cropland
@@ -48,7 +51,7 @@ expand_and_classify <- function(x) {
 }
 
 # Apply the classification function to each cell in the raster
-cropland_proportion_raster <- calc(land_cover_2005_raster, fun = expand_and_classify)
+cropland_proportion_2005_raster <- calc(lc2005_raster, fun = expand_and_classify)
 
 # Threshold to create a binary map of cropland vs non-cropland
 # If proportion >= 0.38, classify as cropland (1), otherwise non-cropland (0)
@@ -61,7 +64,7 @@ cropland_binary <- calc(cropland_proportion_raster, fun = function(x) {
 })
 
 # Save the final binary cropland raster
-writeRaster(cropland_2005, "Data/ESA_LC/Cropland_2005_binary.tif", format = "GTiff", overwrite = TRUE)
+writeRaster(cropland_2005, "pre_proccessed/Cropland_2005_binary.tif", format = "GTiff", overwrite = TRUE)
 
 # Plot for verification
 plot(cropland_raster, main = "Binary Cropland Map (2005)")
