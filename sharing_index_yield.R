@@ -47,12 +47,29 @@ df$yield_class <- cut(df$total_yield,
 # Create a bivariate class (1 to 9)
 df$bivar_class <- (df$sharing_class - 1) * 3 + df$yield_class
 
+### save as a tif file ####
+# Simplest approach to create bivariate GeoTIFF
+# First, get the cell indices for each point in our dataframe
+cells <- cellFromXY(sharing_index, as.matrix(df[, c("x", "y")]))
+
+# Create a new raster filled with NA values
+biv_rast <- sharing_index
+values(biv_rast) <- NA
+names(biv_rast) <- "bivariate_class"
+
+# Assign bivariate class values to the cells
+biv_rast[cells] <- df$bivar_class
+
+# Save the raster
+writeRaster(biv_rast, "sharing_index_yield/sharing_yield_2000.tif", overwrite=TRUE)
+
+#### PLOT IN R ####
 # Create a 3x3 bivariate color palette
-# Red represents high sharing index, Blue represents high yield
+# Purple top, blue left, green right, light green/white bottom
 bivar_colors <- c(
-  "#e8e8e8", "#b5d4e9", "#35978f",  # Low sharing index
-  "#dfb0d6", "#a3a0cb", "#5560AA",  # Medium sharing index
-  "#e4419d", "#ab12a3", "#6a51a3"   # High sharing index
+  "#e8f4d9", "#9ed98e", "#52b353",  # Low sharing index (bottom right to middle right)
+  "#93c5df", "#b8b8b8", "#7aba7a",  # Medium sharing index (lower left to middle)
+  "#4575b5", "#8a6fb0", "#8860a7"   # High sharing index (top left to top right)
 )
 
 # Plot the bivariate map
@@ -69,39 +86,74 @@ p <- ggplot(df) +
     plot.title = element_text(hjust = 0.5)
   )
 
-# Function to create the diamond legend
-create_bivariate_legend <- function() {
-  # Create a 3x3 matrix for the legend
-  legend_df <- expand.grid(x = 1:3, y = 1:3)
-  legend_df$bivar_class <- (legend_df$y - 1) * 3 + legend_df$x
+# Create a rotated diamond legend function
+create_rotated_diamond_legend <- function() {
+  # Create a data frame for the legend 
+  # We'll use a different approach to create a rotated diamond
+  x_values <- c(0, 1, 2, 1, 0) # Pentagon points
+  y_values <- c(1, 0, 1, 2, 1) # Pentagon points
   
-  # Create the plot
-  legend_plot <- ggplot(legend_df) +
-    geom_tile(aes(x = x, y = y, fill = factor(bivar_class))) +
+  # Create the base polygon for rotation reference
+  base_poly <- data.frame(x = x_values, y = y_values)
+  
+  # Create a grid of points for our 3x3 matrix
+  legend_df <- expand.grid(
+    x = seq(0, 2, length.out = 3), 
+    y = seq(0, 2, length.out = 3)
+  )
+  
+  # Assign bivariate classes
+  # We need to flip the sharing_class assignment to match the example image orientation
+  legend_df$yield_class <- cut(legend_df$x, breaks = c(-Inf, 0.67, 1.33, Inf), labels = FALSE)
+  legend_df$sharing_class <- cut(legend_df$y, breaks = c(-Inf, 0.67, 1.33, Inf), labels = FALSE)
+  legend_df$bivar_class <- (legend_df$sharing_class - 1) * 3 + legend_df$yield_class
+  
+  # Create the rotated legend plot
+  legend_plot <- ggplot() +
+    # Add the colored squares
+    geom_tile(data = legend_df, aes(x = x, y = y, fill = factor(bivar_class)), color = "white", size = 0.5) +
     scale_fill_manual(values = bivar_colors, guide = "none") +
-    coord_equal() +
+    # Add text labels for the axes
+    annotate("text", x = 1, y = 2.5, label = "High Sharing Index", size = 3.5) +
+    annotate("text", x = 1, y = -0.5, label = "Low Sharing Index", size = 3.5) +
+    annotate("text", x = -0.5, y = 1, label = "Low Yield", size = 3.5, angle = 90) +
+    annotate("text", x = 2.5, y = 1, label = "High Yield", size = 3.5, angle = 90) +
+    # Set plot limits to make space for labels
+    coord_equal(xlim = c(-1, 3), ylim = c(-1, 3)) +
     theme_void() +
     theme(
-      panel.background = element_rect(fill = "white"),
-      plot.margin = unit(c(1, 1, 1, 1), "cm")
-    ) +
-    # Add labels
-    annotate("text", x = 0.5, y = 2, label = "Low", angle = 90) +
-    annotate("text", x = 3.5, y = 2, label = "High", angle = 90) +
-    annotate("text", x = 2, y = 0.5, label = "Low") +
-    annotate("text", x = 2, y = 3.5, label = "High") +
-    # Add variable names
-    annotate("text", x = 0, y = 2, label = "Sharing Index", angle = 90, hjust = 0.5) +
-    annotate("text", x = 2, y = 0, label = "Total Yield", hjust = 0.5)
+      panel.background = element_rect(fill = "white", color = NA),
+      plot.margin = margin(20, 20, 20, 20)
+    )
   
   return(legend_plot)
 }
 
-# Create the legend
-legend <- create_bivariate_legend()
+# Create the legend with the rotated diamond approach
+legend <- create_rotated_diamond_legend()
 
-# Use cowplot to arrange the plots
+# Arrange the map and legend using cowplot
 final_plot <- plot_grid(p, legend, ncol = 2, rel_widths = c(3, 1))
+final_plot
 
 # Save the final plot
 ggsave("sharing_index_yield/sharing_yield_2000.png", final_plot, width = 12, height = 8, dpi = 300)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
